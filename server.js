@@ -1,132 +1,155 @@
-const fs = require('fs');
 const http = require('http');
 const Koa = require('koa');
-const { koaBody } = require('koa-body');
-const path = require('path');
-const uuid = require('uuid');
+const koaBody = require('koa-body');
+
+const router = require('./routes');
 
 const app = new Koa();
 
-let subscriptions = [];
-
 app.use(koaBody({
-    urlencoded: true,
-    multipart: true,
+  urlencoded: true,
 }));
 
+app.use( async (ctx, next) => {
+  const origin = ctx.request.get('Origin');
+  if (!origin) {
+    return await next();
+  }
 
-app.use((ctx, next) => {
-    if (ctx.request.method !== 'OPTIONS') {
-        next();
-        return;
+  const headers = { 'Access-Control-Allow-Origin': '*', };
+
+  if (ctx.request.method !== 'OPTIONS') {
+    ctx.response.set({ ...headers });
+    try {
+      return await next();
+    } catch (e) {
+      e.headers = { ...e.headers, ...headers };
+      throw e;
     }
-    ctx.response.set('Access-Control-Allow-Origin', '*');
-    ctx.response.set('Access-Control-Allow-Methods', 'DELETE, PUT, PATCH, GET, POST');
+  }
+
+  if (ctx.request.get('Access-Control-Request-Method')) {
+    ctx.response.set({
+      ...headers,
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH',
+    });
+
+    if (ctx.request.get('Access-Control-Request-Headers')) {
+      ctx.response.set('Access-Control-Allow-Headers', ctx.request.get('Access-Control-Request-Headers'));
+    }
+
     ctx.response.status = 204;
-});
-
-// // добавление файла
-app.use((ctx,  next) => {
-
-    console.log(ctx.request.url,'ctx.request.url');
-
-    if (ctx.request.method === 'POST' && ctx.request.url === '/upload') {
-
-        console.log('это загрузка файла')
-        ctx.response.set('Access-Control-Allow-Origin', '*');
-        console.log(ctx.request.files, 'ctx.request.files');
-        let fileName;
-    
-        try {    
-            const public = path.join(__dirname, '/public');
-    
-            const { file } = ctx.request.files;
-
-            const subfolder = uuid.v4();
-
-            const uploadFolder = public + '/' + subfolder;
-
-            fs.mkdirSync(uploadFolder);
-    
-            fs.copyFileSync(file.filepath, uploadFolder + '/' + file.originalFilename);
-            
-            
-        } catch (error) {
-            ctx.response.status = 500;
-    
-            return;
-        }
-        ctx.response.body = 'ok';
-         
-    } else {
-
-        next();
-        return;
-    
-}});
-
-// добавление данных. если номер уже есть то записи нет
-app.use((ctx,  next) => {
-    if (ctx.request.method !== 'POST') {
-        next();
-        return;
-    }
-    console.log(ctx.request.body, 'ctx.request.body');
-
-    const { name, phone } = ctx.request.body;
-
-    ctx.response.set('Access-Control-Allow-Origin', '*');
-
-    if (subscriptions.some(sub => sub.phone === phone)) {
-        ctx.response.status = 400;
-        ctx.response.body = 'subscription exists';
-        return;
-    }
-    subscriptions.push({ name, phone });
-    
-    ctx.response.body = 'ok, добавили';
-
-    next();
-});
-
-// удаление данных. если номера нет то не удалит
-app.use((ctx,  next) => {
-    if (ctx.request.method !== 'DELETE') {
-        next();
-        return;
-    }
-    console.log(ctx.request.body, 'ctx.request.body');
-
-    const { phone } = ctx.request.query;
-    console.log(phone,'phone');
-
-    ctx.response.set('Access-Control-Allow-Origin', '*');
-
-    if (subscriptions.every(sub => sub.phone !== phone)) {
-        ctx.response.status = 400;
-        ctx.response.body = 'subscription doesn`t exists';
-        return;
-    }
-    subscriptions = subscriptions.filter(sub => sub.phone !== phone);
-    
-    ctx.response.body = 'ok, удалили';
-
-    next();
+  }
 });
 
 
-app.use((ctx) => {
-    console.log('second midleware');
-})
+app.use(router());
 
+const port = process.env.PORT || 7070;
 const server = http.createServer(app.callback());
 
-const port = 7070;
+function getCurrentDateTime() {
+    const currentDate = new Date();
+  
+    // Получение времени в формате hh:mm
+    const hours = currentDate.getHours().toString().padStart(2, '0');
+    const minutes = currentDate.getMinutes().toString().padStart(2, '0');
+    const time = `${hours}:${minutes}`;
+  
+    // Получение даты в формате dd.mm.yyyy
+    const day = currentDate.getDate().toString().padStart(2, '0');
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0'); // Месяцы начинаются с 0
+    const year = currentDate.getFullYear();
+  
+    const date = `${day}.${month}.${year}`;
+  
+    return `${time} ${date}`;
+  }
+  
 
-server.listen(port, (err) => {
-    if (err) {
-        console.log(err);
-        return;
+const WebSocket = require('ws');
+let activeUsers = [];
+
+let users = {};
+
+
+const wss = new WebSocket.Server({ server });
+
+const nicknames = new Map();
+
+wss.on('connection', function connection(ws) {
+
+  ws.on('message', function incoming(message) {
+
+    const data = JSON.parse(message);
+    console.log(data,'сообщение от клиента')
+    // если приоединяется участник
+    if (data.type === 'joinChat') {
+
+        activeUsers.push(data.nickname);
+
+        users[ws] = data.nickname;
+    
+        console.log(activeUsers,'activeUsers')
+        wss.clients.forEach(function each(client) {
+            if (client.readyState === WebSocket.OPEN) { 
+      
+              client.send(JSON.stringify({ type: 'joinChat', activeUsers: `${activeUsers}` }));
+            };
+          });     
     }
-    console.log('server is listening to port ' + port);
-})
+
+    if (data.type === 'checkNickname') {
+
+      if (!nicknames.has(data.nickname)) {
+
+        nicknames.set(data.nickname, ws);
+
+        ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: true, nickname: `${data.nickname}` }));
+
+      } else {
+        ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: false }));
+      }
+    } else if (data.type === 'sendMessage') {
+
+      const nickname = data.nickname;
+      console.log(nickname,'nickname')
+
+      const message = data.message;
+
+      wss.clients.forEach(function each(client) {
+
+        if (client.readyState === WebSocket.OPEN) {
+
+          const currentTime = getCurrentDateTime(); 
+          const messageToClient = JSON.stringify({ type: 'message', message: {nickname: `${nickname}`, currentTime: `${currentTime}`, message: `${message}`} });
+          client.send(messageToClient);
+
+        }
+      });
+    }
+  });
+
+  ws.on('close', () => {
+    
+    // Удаляем отключенного клиента из массива
+    const deletedUser = users[ws];
+    console.log(`Клиент отключился ${deletedUser}`);
+
+    // Удаляем пользователя из объекта users
+    delete users[ws];
+    activeUsers = activeUsers.filter(client => client !== deletedUser);
+
+    wss.clients.forEach(function each(client) {
+        if (client !== ws && client.readyState === WebSocket.OPEN) { 
+  
+          client.send(JSON.stringify({ type: 'leaveChat', activeUsers: `${activeUsers}` }));
+        };
+      });
+   });
+});
+
+server.listen(port, function listening() {
+  console.log('WebSocket server is running on port 7070');
+
+});
