@@ -149,7 +149,7 @@ wss.on('connection', function connection(ws) {
    });
 });
 
-server.listen(port, function listening() {
+server.listen(7070, function listening() {
   console.log('WebSocket server is running on port 7070');
 
 });
