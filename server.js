@@ -2,6 +2,16 @@ const http = require('http');
 const Koa = require('koa');
 const app = new Koa();
 
+app.use((ctx, next) => {  
+
+    if (ctx.request.url === '/') {
+
+        ctx.response.set('Access-Control-Allow-Origin', '*');
+        ctx.response.body = 'Hello, World!';
+        return;
+      }
+}); 
+
 const port = process.env.PORT || 7070;
 const server = http.createServer(app.callback());
 
