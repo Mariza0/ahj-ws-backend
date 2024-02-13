@@ -36,11 +36,9 @@ function getCurrentDateTime() {
 const WebSocket = require('ws');
 let activeUsers = [];
 
-let users = new Map();//{};
+let users = new Map();
 
 const wss = new WebSocket.Server({ server });
-
-const nicknames = new Map();
 
 wss.on('connection', function connection(ws) {
 
@@ -56,7 +54,6 @@ wss.on('connection', function connection(ws) {
         console.log(`Клиент отключился ${deletedUser}`);
 
         // и Удаляем пользователя из объекта активных users
-        // delete users[ws];
         activeUsers = activeUsers.filter(client => client !== deletedUser);
         console.log(`список пользователей после удаления ${activeUsers}`);
 
@@ -138,7 +135,7 @@ wss.on('connection', function connection(ws) {
    });
 });
 
-server.listen(7070, function listening() {
+server.listen(port, function listening() {
   console.log('WebSocket server is running on port 7070');
 
 });
