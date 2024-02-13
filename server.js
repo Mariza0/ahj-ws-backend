@@ -36,7 +36,7 @@ function getCurrentDateTime() {
 const WebSocket = require('ws');
 let activeUsers = [];
 
-let users = {};
+let users = new Map();//{};
 
 const wss = new WebSocket.Server({ server });
 
@@ -48,12 +48,33 @@ wss.on('connection', function connection(ws) {
 
     const data = JSON.parse(message);
     console.log(data,'сообщение от клиента')
+
+    if (data.type === 'leaveChat') {
+
+        // находим отключенного клиента из массива
+        const deletedUser = users.get(ws);//users[ws];
+        console.log(`Клиент отключился ${deletedUser}`);
+
+        // и Удаляем пользователя из объекта активных users
+        // delete users[ws];
+        activeUsers = activeUsers.filter(client => client !== deletedUser);
+        console.log(`список пользователей после удаления ${activeUsers}`);
+
+        wss.clients.forEach(function each(client) {
+            if (client !== ws && client.readyState === WebSocket.OPEN) { 
+  
+            client.send(JSON.stringify({ type: 'leaveChat', activeUsers: `${activeUsers}` }));
+            };
+        });    
+    }
+
     // если приоединяется участник
     if (data.type === 'joinChat') {
 
-        activeUsers.push(data.nickname);
+        // Добавляем нового пользователя в список пользователей
+        users.set(ws, data.nickname);
 
-        users[ws] = data.nickname;
+        activeUsers.push(data.nickname);
     
         console.log(activeUsers,'activeUsers')
         wss.clients.forEach(function each(client) {
@@ -66,14 +87,17 @@ wss.on('connection', function connection(ws) {
 
     if (data.type === 'checkNickname') {
 
-      if (!nicknames.has(data.nickname)) {
+      if (!users.has(data.nickname)) {
+        // if (!users.has(ws)) {
+            // users[ws] = data.nickname;
 
-        nicknames.set(data.nickname, ws);
+        users.set(ws, data.nickname);
 
-        ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: true, nickname: `${data.nickname}` }));
+        ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: true}));//, nickname: `${data.nickname}` }));
 
       } else {
         ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: false }));
+      
       }
     } else if (data.type === 'sendMessage') {
 
@@ -97,13 +121,13 @@ wss.on('connection', function connection(ws) {
 
   ws.on('close', () => {
     
-    // Удаляем отключенного клиента из массива
-    const deletedUser = users[ws];
+    // Удаляем отключенного клиента из списка пользователей
+    const deletedUser = users.get(ws);
     console.log(`Клиент отключился ${deletedUser}`);
 
-    // Удаляем пользователя из объекта users
-    delete users[ws];
+    // фильтруем список активных пользователей
     activeUsers = activeUsers.filter(client => client !== deletedUser);
+    console.log(`список после удаления ${activeUsers}`)
 
     wss.clients.forEach(function each(client) {
         if (client !== ws && client.readyState === WebSocket.OPEN) { 
