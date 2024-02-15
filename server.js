@@ -10,7 +10,13 @@ app.use((ctx, next) => {
         ctx.response.body = 'Hello, World!';
         return;
       }
-}); 
+});
+
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "https://mariza0.github.io/ahj-ws-frontend/");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
 
 const port = process.env.PORT || 7070;
 const server = http.createServer(app.callback());
@@ -136,6 +142,6 @@ wss.on('connection', function connection(ws) {
 });
 
 server.listen(port, function listening() {
-  console.log('WebSocket server is running on port 7070');
+  console.log(`WebSocket server is running on port ${port}`);
 
 });
