@@ -12,11 +12,11 @@ app.use((ctx, next) => {
       }
 });
 
-app.use(function(req, res, next) {
-    res.header("Access-Control-Allow-Origin", "https://mariza0.github.io/ahj-ws-frontend/");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    next();
-});
+// app.use(function(req, res, next) {
+//     res.header("Access-Control-Allow-Origin", "https://mariza0.github.io/ahj-ws-frontend/");
+//     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+//     next();
+// });
 
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "http://localhost:8080/");
