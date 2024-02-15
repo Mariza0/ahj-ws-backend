@@ -97,8 +97,6 @@ wss.on('connection', function connection(ws) {
     if (data.type === 'checkNickname') {
 
       if (!users.has(data.nickname)) {
-        // if (!users.has(ws)) {
-            // users[ws] = data.nickname;
 
         users.set(ws, data.nickname);
 
