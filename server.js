@@ -96,11 +96,14 @@ wss.on('connection', function connection(ws) {
 
     if (data.type === 'checkNickname') {
 
-      if (!users.has(data.nickname)) {
+      const user = activeUsers.find(element => element === data.nickname);
+
+      if (!user) {
 
         users.set(ws, data.nickname);
-
-        ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: true}));//, nickname: `${data.nickname}` }));
+        
+        console.log(`вносим новое имя пользователя`)
+        ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: true, nickname: data.nickname }));
 
       } else {
         ws.send(JSON.stringify({ type: 'nicknameStatus', isAvailable: false }));
